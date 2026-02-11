@@ -1,0 +1,471 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r bibliotecas}
+library("tidyr")
+library("dplyr")
+library("ggplot2")
+if(!require(cluster)) install.packages("cluster")
+library("cluster")
+library("randomForest")
+library("neuralnet")
+library("reticulate")
+if(!require(rpart)) install.packages("rpart")
+library(rpart)
+library(rpart.plot)
+if(!require(rpart.plot)) install.packages("rpart.plot")
+#if(!require(fmsb)) install.packages("fmsb")
+#library(fmsb)
+#if(!require(scales)) install.packages("scales")
+#library(scales)
+#if(!require(igraph)) install.packages("igraph")
+#library(igraph)
+#if(!require(remotes))install.packages("remotes")
+#remotes::install_github("araastat/reprtree")
+if(!require(reprtree)) install.packages("reprtree")
+library(reprtree)
+if(!require(randomForestExplainer)) install.packages("randomForestExplainer")
+library(randomForestExplainer)
+if(!require(shiny)) install.packages("shiny")
+if(!require(shinydashboard)) install.packages("shinydashboard")
+if(!require(caret)) install.packages("caret")
+library(caret)
+```
+
+# DATASETs Siniestros Viales
+Voy a utilizar los datasets de los accidentes de tránsito y los vehículos involucrados entre los años 2018 y 2025 (septiembre ultima actalización) de la ciuda de Corrientes, provincia de Corrientes (Argentina). Estos sets de datos tienen una variable en común (id_feu).
+origen de los sets de datos: https://datos.ciudaddecorrientes.gov.ar/dataset/observatorio-vial
+
+
+```{r dataset accidentes}
+dfAcci18 <- read.csv("acci_ctes_2018.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci19 <- read.csv("acci_ctes_2019.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci20 <- read.csv("acci_ctes_2020.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci21 <- read.csv("acci_ctes_2021.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci22 <- read.csv("acci_ctes_2022.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci23 <- read.csv("acci_ctes_2023.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci24 <- read.csv("acci_ctes_2024.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci25 <- read.csv("acci_ctes_2025.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+```
+
+# DATASETs vehiculos involucrados
+```{r dataset vehiculos involucrados}
+dfVehi18 <- read.csv("vehiculos_involucrados_2018.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi19 <- read.csv("vehiculos_involucrados_2019.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi20 <- read.csv("vehiculos_involucrados_2020.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi21 <- read.csv("vehiculos_involucrados_2021.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi22 <- read.csv("vehiculos_involucrados_2022.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi23 <- read.csv("vehiculos_involucrados_2023.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi24 <- read.csv("vehiculos_involucrados_2024.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfVehi25 <- read.csv("vehiculos_involucrados_2025.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+```
+
+
+# Utilizo la función separate() para separar los datos de la columna "siniestro_fecha" en tres columnas
+
+```{r SEPARANDO FECHAS}
+dfAcci18 <- separate(dfAcci18, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci19 <- separate(dfAcci19, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci20 <- separate(dfAcci20, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci21 <- separate(dfAcci21, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci22 <- separate(dfAcci22, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci23 <- separate(dfAcci23, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci24 <- separate(dfAcci24, col = siniestro_fecha, into = c("anio", "mes", "dia"), sep = "-")
+dfAcci25 <- separate(dfAcci25, col = siniestro_fecha, into = c("dia", "mes", "anio"), sep = "/")
+```
+
+## Elimino columna "modelo" que sólo está presente en el dataframe dfVehi19.
+```{r}
+## Elimino la columna "modelo" del dataframe dfVehi19 porque los demás no la tienen.
+dfVehi19$modelo <- NULL
+```
+
+
+# Unificar los datasets
+```{r unificar datasets}
+dfAccis <- rbind(dfAcci18, dfAcci19, dfAcci20, dfAcci21, dfAcci22, dfAcci23, dfAcci24, dfAcci25)
+dfVehi <- rbind(dfVehi18, dfVehi19, dfVehi20, dfVehi21, dfVehi22, dfVehi23, dfVehi24, dfVehi25)
+```
+
+
+## UNIFICO los 2 dataframe por "id_feu"
+```{r unificando datasets}
+dfAccis <- merge(dfAccis, dfVehi, by="id_feu")
+```
+
+## Algunas transformaciones
+```{r transformaciones}
+dfAccis$dia <- as.numeric(dfAccis$dia)
+dfAccis$mes <- as.numeric(dfAccis$mes)
+dfAccis$anio <- as.numeric(dfAccis$anio)
+dfAccis <- dfAccis[dfAccis$tipo_siniestro_unico != "S/D",]
+dfAccis <- dfAccis[ !dfAccis$tipo_involucrado %in% 
+           c("Cuatriciclo", "Vehículos de movilidad personal"), ]
+dfAccis <- dfAccis[!dfAccis$estado_fisico_ambiental %in%
+            c("Mojada", "S/D", "S/D FisicoAmbiental", "Otro FisicoAmbiental"), ]
+#Otro FisicoAmbiental, S/D, S/D FisicoAmbiental
+```
+
+
+# ANALISIS DATAFRAME
+```{r}
+summary(dfAccis)
+str(dfAccis)
+```
+# Elimino columnas que no utilizaré o que están duplicadas en el Dataframe anterior
+```{r}
+## Elimino la columna "modelo" del dataframe dfVehi19 porque los demás no la tienen.
+dfVehi$provincia <- NULL
+dfVehi$id_provincia <- NULL
+dfVehi$otro_tipo_involucrado <- NULL
+dfVehi$tipo_servicio_vehiculo <- NULL
+dfVehi$otro_tipo_involucrado <- NULL
+dfVehi$tipo_vehiculo_de_movilidad_personal <- NULL
+dfVehi$tipo_de_bicicleta <- NULL
+dfVehi$tipo_de_transporte_de_carga <- NULL
+dfVehi$tipo_traccion_a_sangre <- NULL
+dfVehi$sustancias_peligrosas <- NULL
+dfVehi$tipo_transporte_pasajeros <- NULL
+dfVehi$siniestro_fecha <- NULL
+```
+# NORMALIZAR y CREAR DATAFRAME PARA TESTEO Y ENTRENAMIENTO
+
+## ENTRENAMIENTO Y TESTEO. 
+Se utiliza la función "sample" para generar una muestra con el 60% de los datos, sin reemplazo
+Training (60-80% del dataframe) se usa para que el modelo aprenda.
+Testing (40-20% del dataframe) se usa para evaluar que tan bien generealiza el modelo
+```{r}
+##TESTING y TRANING
+set.seed(326)
+n <- nrow(dfAccis)
+muestra <- sample(x=1:n, size = n*.6, replace = FALSE)
+dfTraining <- dfAccis[muestra,]
+dfTesting <- dfAccis[-muestra,]
+```
+
+
+
+# GRAFICO DE LINEAS MES A MES POR AÑO
+
+Utilizo la función .group_by para agrupar los datos de un DataFrame según una o más columnas, para luego aplicar una operación de agregación (suma, promedio, conteo, etc.) sobre cada grupo.
+
+**group_by(mes, anio)** → arma grupos por mes y año. **summarise(...)** → calcula la suma de vehiculos en cada grupo. **.groups** = "drop" → le dice a summarise qué hacer con la agrupación después del cálculo. \### Valores posibles de .groups **"drop"** ➝ El resultado ya no queda agrupado. (Es lo más común, porque después de resumir ya querés un dataframe plano).
+
+**"drop_last" (default si agrupás por varias variables)** ➝ Elimina solo la última variable usada en group_by, pero mantiene agrupación por las demás. Ej: si agrupaste por anio, mes, al resumir queda aún agrupado por anio.
+
+**"drop_keep"** ➝ Mantiene exactamente la misma agrupación que tenías antes.
+
+**"keep"** ➝ Igual que "drop_keep", es decir, mantiene todos los grupos.
+
+Establece la estética (**aes**): x = mes → el eje horizontal es el número de mes (1–12). y = total_vehiculos → el eje vertical es la cantidad de vehículos involucrados. color = as.factor(anio) → cada año se dibuja en un color distinto.
+
+group = anio → asegura que los puntos de un mismo año se unan con una línea (si no, podría unir todos los puntos sin diferenciar año).
+
+```{r accidentes por año}
+#set.seed(32)
+
+dfAccisMesAnio <- dfTraining %>%
+  group_by(mes, anio) %>% #agrupa primero por mes y luego por año
+  summarise(total_vehiculos = sum(vehiculos, na.rm = TRUE), .groups = "drop")
+
+ggplot(dfAccisMesAnio, aes(x=mes, y=total_vehiculos, color = as.factor(anio), group=anio))+
+  geom_line(size=1)+
+  geom_point(size=1.2)+
+  scale_x_continuous(breaks=1:12, labels = c("ene", "feb", "mar", "abr", "may", "jun", "jul", "agos", "sept", "oct", "nov", "dic"))+
+  #scale_color_continuous(low="green", high="red")+
+  labs(
+    title="vehiculos involucrados en accidentes mes a mes, por año",
+    x="meses del año",
+    y="vehiculos",
+    color="año"
+  )+
+  theme_minimal()
+```
+
+# ANALISIS DEL RIESGO DE DAÑO HUMANO POR ACCIDENTES DE TRANSITO Y ANALISIS DE LAS VARIABLES
+# ANALISIS DE "cp" PARA VARIABLES OBJETIVOS: heridos+fallecidos
+```{r analisis cp siniestralidad}
+set.seed(326)
+
+modeloSiniestralidad <- rpart(heridos+fallecidos ~ luminosidad+tipo_siniestro_unico+tipo_involucrado+zona_ocurrencia+via_publica+numero_ocupantes+uso_vehiculo+material_de_la_calzada+estado_fisico_ambiental+vehiculos, data = dfTraining, method = "anova")
+
+printcp(modeloSiniestralidad)
+plotcp(modeloSiniestralidad)
+```
+# ANALISIS DE "cp" PARA VARIABLES OBJETIVOS: ilesos
+```{r analisis cp ilesos}
+set.seed(326)
+
+modeloIlesos <- rpart(ilesos ~ luminosidad+tipo_siniestro_unico+tipo_involucrado+zona_ocurrencia+via_publica+numero_ocupantes+uso_vehiculo+material_de_la_calzada+estado_fisico_ambiental+vehiculos, data = dfTraining, method = "anova")
+
+printcp(modeloIlesos)
+plotcp(modeloIlesos)
+
+```
+
+
+# ARBOL DE DECISION
+```{r ARBOL DE DECISION METODO REGRESION}
+set.seed(326)
+controles <- rpart.control(maxdepth = 6,cp=0.023929)
+modelo <- rpart(heridos~mes+luminosidad+tipo_siniestro_unico+tipo_involucrado+zona_ocurrencia+via_publica+numero_ocupantes+uso_vehiculo+material_de_la_calzada+estado_fisico_ambiental+vehiculos, data = dfTraining, method = "anova", control = controles)
+#print(modelo)
+
+#mi paleta de colores
+miPaleta <- c("#00FF7F","#00CED1","#FFF032")
+  
+rpart.plot(modelo,
+           #type = 3,
+           #extra=104,
+           box.palette = miPaleta,
+           main="Arbol de decisión")
+```
+
+
+# RESUMEN NODOS ARBOL DE DECISION
+```{r resumen nodos}
+modelo
+resumen <- modelo$frame[modelo$frame$var=="<leaf>", c("yval", "n", "dev")]
+resumen$porcentaje <- round(resumen$n/sum(resumen$n)*100,1)
+resumen
+```
+### PREDICTOR ###
+```{r predictor}
+miPredictor <- predict(modelo, newdata=dfTesting)
+table(miPredictor)
+```
+
+==========================================
+## ARBOL DE DECISION // METHOD: CLASS ##
+==========================================
+```{r analisis cp ilesos}
+set.seed(332)
+
+modeloClass <- rpart(tipo_siniestro_unico ~ mes+luminosidad+tipo_involucrado+zona_ocurrencia+via_publica+numero_ocupantes+uso_vehiculo+material_de_la_calzada+estado_fisico_ambiental, data = dfTraining, method = "class")
+
+printcp(modeloClass)
+plotcp(modeloClass)
+
+```
+```
+
+=================================
+## PLOTEO ARBOL // METHOD CLASS ##
+=================================
+```{r}
+
+set.seed(32)
+controles <- rpart.control(maxdepth = 7,cp=0.01, cex = 0.1)
+modeloClass <- rpart(tipo_involucrado ~ luminosidad+tipo_siniestro_unico+zona_ocurrencia+via_publica+numero_ocupantes+uso_vehiculo+material_de_la_calzada+estado_fisico_ambiental, data = dfTraining, method = "class", control = controles)
+#print(modelo)
+
+#mi paleta de colores
+#miPaleta <- c("#00FF7F","#00CED1","#FFF032")
+  
+rpart.plot(modeloClass,
+           #type = 3,
+           #extra=104,
+           box.palette=list("Oranges", "Grays", "#00FF7F"),
+           main="Arbol de decisión")
+
+modeloClass
+resumen <- modeloClass$frame[modeloClass$frame$var=="<leaf>", c("yval", "n", "dev")]
+resumen$porcentaje <- round(resumen$n/sum(resumen$n)*100,1)
+resumen
+
+```
+
+
+
+#BOXPLOT
+```{r boxplot}
+#dfTraining$severidad <- ifelse(dfTraining$fallecidos>0, "si", "no")
+#dfTraining$severidad <- factor(dfTraining$siniestralidad)
+#mi paleta de colores
+miPaleta <- c("#00FF7F","#00CED1","#F4A460", "#FFF032")
+boxplot(heridos+fallecidos~luminosidad,
+        data=dfTraining,
+        main="BOX PLOT",
+        xlab = "luminosidad",
+        ylab= "severidad",
+        col = miPaleta
+        #vertical=FALSE
+        )
+```
+
+
+
+### SHINY ####
+
+```{r mi dashboard}
+
+ui <- fluidPage(
+  titlePanel("Análisis de Riesgo de Daño Humano por Accidentes de Tránsito"),
+
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("cp",
+                  "Complejidad (cp) Árbol de Regresión",
+                  min = 0.001, max = 0.05, value = 0.020303, step = 0.001),
+      sliderInput("depth",
+                  "Profundidad máxima del árbol",
+                  min = 2, max = 10, value = 6)
+    ),
+
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Accidentes por Año", plotOutput("lineas")),
+        tabPanel("CP Siniestralidad",
+                 verbatimTextOutput("cpSin"),
+                 plotOutput("plotCpSin")),
+        tabPanel("CP Ilesos",
+                 verbatimTextOutput("cpIle"),
+                 plotOutput("plotCpIle")),
+        tabPanel("Árbol de Decisión", plotOutput("arbol")),
+        tabPanel("Resumen Nodos", tableOutput("nodos")),
+        tabPanel("Predicción", tableOutput("pred")),
+        tabPanel("Boxplot", plotOutput("box"))
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+
+  # =======================
+  # Accidentes por mes/año
+  # =======================
+  output$lineas <- renderPlot({
+    dfAcc <- dfTraining %>%
+      group_by(mes, anio) %>%
+      summarise(total_vehiculos = sum(vehiculos, na.rm = TRUE),
+                .groups = "drop")
+
+    ggplot(dfAcc, aes(x = mes, y = total_vehiculos,
+                      color = as.factor(anio), group = anio)) +
+      geom_line(size = 1) +
+      geom_point(size = 1.2) +
+      scale_x_continuous(
+        breaks = 1:12,
+        labels = c("ene","feb","mar","abr","may","jun",
+                   "jul","agos","sept","oct","nov","dic")
+      ) +
+      labs(
+        title = "Vehículos involucrados en accidentes",
+        x = "Mes",
+        y = "Vehículos",
+        color = "Año"
+      ) +
+      theme_minimal()
+  })
+
+  # =======================
+  # CP Siniestralidad
+  # =======================
+  modeloSiniestralidad <- reactive({
+    rpart(
+      heridos + fallecidos ~ mes + luminosidad + tipo_siniestro_unico +
+        tipo_involucrado + zona_ocurrencia + via_publica +
+        nombre_via + numero_ocupantes + uso_vehiculo +
+        material_de_la_calzada + estado_fisico_ambiental + vehiculos,
+      data = dfTraining,
+      method = "anova"
+    )
+  })
+
+  output$cpSin <- renderPrint({
+    printcp(modeloSiniestralidad())
+  })
+
+  output$plotCpSin <- renderPlot({
+    plotcp(modeloSiniestralidad())
+  })
+
+  # =======================
+  # CP Ilesos
+  # =======================
+  modeloIlesos <- reactive({
+    rpart(
+      ilesos ~ mes + luminosidad + tipo_siniestro_unico +
+        tipo_involucrado + zona_ocurrencia + via_publica +
+        numero_ocupantes + uso_vehiculo +
+        material_de_la_calzada + estado_fisico_ambiental + vehiculos,
+      data = dfTraining,
+      method = "anova"
+    )
+  })
+
+  output$cpIle <- renderPrint({
+    printcp(modeloIlesos())
+  })
+
+  output$plotCpIle <- renderPlot({
+    plotcp(modeloIlesos())
+  })
+
+  # =======================
+  # Árbol principal
+  # =======================
+  modelo <- reactive({
+    rpart(
+      heridos ~ mes + luminosidad + tipo_siniestro_unico +
+        tipo_involucrado + zona_ocurrencia + via_publica +
+        numero_ocupantes + uso_vehiculo +
+        material_de_la_calzada + estado_fisico_ambiental + vehiculos,
+      data = dfTraining,
+      method = "anova",
+      control = rpart.control(
+        maxdepth = input$depth,
+        cp = input$cp
+      )
+    )
+  })
+
+  output$arbol <- renderPlot({
+    miPaleta <- c("#00FF7F", "#00CED1", "#FFF032")
+    rpart.plot(modelo(),
+               box.palette = miPaleta,
+               main = "Árbol de Decisión (Regresión)")
+  })
+
+  # =======================
+  # Resumen nodos
+  # =======================
+  output$nodos <- renderTable({
+    m <- modelo()
+    resumen <- m$frame[m$frame$var == "<leaf>", c("yval", "n", "dev")]
+    resumen$porcentaje <- round(resumen$n / sum(resumen$n) * 100, 1)
+    resumen
+  })
+
+  # =======================
+  # Predicción
+  # =======================
+  output$pred <- renderTable({
+    miPredictor <- predict(modelo(), newdata = dfTesting)
+    data.frame(prediccion = miPredictor)
+    table(miPredictor)
+  })
+
+  # =======================
+  # Boxplot
+  # =======================
+  output$box <- renderPlot({
+    miPaleta <- c("#00FF7F","#00CED1","#F4A460","#FFF032")
+    boxplot(heridos + fallecidos ~ luminosidad,
+            data = dfTraining,
+            main = "Heridos + Fallecidos según Luminosidad",
+            xlab = "Luminosidad",
+            ylab = "Severidad",
+            col = miPaleta)
+  })
+}
+
+shinyApp(ui, server)
+
+
+```
+
+
