@@ -40,14 +40,24 @@ origen de los sets de datos: https://datos.ciudaddecorrientes.gov.ar/dataset/obs
 
 
 ```{r dataset accidentes}
-dfAcci18 <- read.csv("acci_ctes_2018.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci19 <- read.csv("acci_ctes_2019.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci20 <- read.csv("acci_ctes_2020.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci21 <- read.csv("acci_ctes_2021.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci22 <- read.csv("acci_ctes_2022.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci23 <- read.csv("acci_ctes_2023.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci24 <- read.csv("acci_ctes_2024.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-dfAcci25 <- read.csv("acci_ctes_2025.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+url18 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2018.csv"
+url19 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2019.csv"
+url20 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2020.csv"
+url21 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2021.csv"
+url22 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2022.csv"
+url23 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2023.csv"
+url24 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2024.csv"
+url25 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2025.csv"
+url <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2018.csv"
+
+dfAcci18 <- read.csv(url18, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci19 <- read.csv(url19, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci20 <- read.csv(url20, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci21 <- read.csv(url21, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci22 <- read.csv(url22, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci23 <- read.csv(url23, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci24 <- read.csv(url24, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+dfAcci25 <- read.csv(url25, header = TRUE, sep = ",", stringsAsFactors = FALSE)
 ```
 
 # DATASETs vehiculos involucrados
@@ -467,5 +477,6 @@ shinyApp(ui, server)
 
 
 ```
+
 
 
