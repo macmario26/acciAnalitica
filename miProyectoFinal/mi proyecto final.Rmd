@@ -48,7 +48,6 @@ url22 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProy
 url23 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2023.csv"
 url24 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2024.csv"
 url25 <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2025.csv"
-url <- "https://raw.githubusercontent.com/macmario26/acciAnalitica/main/miProyectoFinal/acci_ctes_2018.csv"
 
 dfAcci18 <- read.csv(url18, header = TRUE, sep = ",", stringsAsFactors = FALSE)
 dfAcci19 <- read.csv(url19, header = TRUE, sep = ",", stringsAsFactors = FALSE)
@@ -477,6 +476,7 @@ shinyApp(ui, server)
 
 
 ```
+
 
 
 
